@@ -19,16 +19,16 @@ func NewTemplate(t []byte) *Template {
 	return &Template{template: t, places: Find(t)}
 }
 
-func (t *Template) Replace(bf Buffer, replacements map[string]io.ReadSeeker) {
-	Replace(t.template, bf, t.places, replacements)
+func (t *Template) ReplaceBytes(wr io.Writer, replacements map[string][]byte) {
+	ReplaceBytes(t.template, wr, t.places, replacements)
+}
+
+func (t *Template) Replace(wr io.Writer, replacements map[string]io.ReadSeeker) {
+	Replace(t.template, wr, t.places, replacements)
 }
 
 func (t *Template) ReplaceString(bf Buffer, replacements map[string]string) {
 	ReplaceString(t.template, bf, t.places, replacements)
-}
-
-func (t *Template) ReplaceBytes(bf Buffer, replacements map[string][]byte) {
-	ReplaceBytes(t.template, bf, t.places, replacements)
 }
 
 func (t *Template) ReplaceMapper(bf Buffer, mapper Mapper) {
@@ -75,7 +75,7 @@ func Find(template []byte) (places []int) {
 // the replacements found inside the map and writes the result to the buffer.
 // The given template must be the unchanged byte array that was passed to Find in order to get the
 // places. For strings as replacements see the optimized ReplaceString function for bytes use ReplaceBytes.
-func Replace(template []byte, bf Buffer, places []int, replacements map[string]io.ReadSeeker) {
+func Replace(template []byte, wr io.Writer, places []int, replacements map[string]io.ReadSeeker) {
 	var (
 		last        int
 		first       int
@@ -106,21 +106,21 @@ func Replace(template []byte, bf Buffer, places []int, replacements map[string]i
 		first = places[i]
 
 		// take the bytes from the last position within the template up to the placeholder
-		bf.Write(template[last:first])
+		wr.Write(template[last:first])
 
 		// lookup the placeholder name within the replacements and
 		// write the replacement if we found one
 		replacement, has = replacements[string(template[first+2:places[i+1]])]
 		if has {
 			replacement.Seek(0, 0)
-			io.Copy(bf, replacement)
+			io.Copy(wr, replacement)
 		}
 
 		// track the last position for the next iteration
 		last = places[i+1] + 2
 	}
 
-	bf.Write(template[last:]) // write any remaining parts of the template that don't have any placeholders
+	wr.Write(template[last:]) // write any remaining parts of the template that don't have any placeholders
 }
 
 // The Buffer interface is fullfilled by *bytes.Buffer. However since for performance reasons
@@ -186,7 +186,7 @@ func ReplaceString(template []byte, bf Buffer, places []int, replacements map[st
 // the replacements found inside the map and writes the result to the buffer.
 // The given template must be the unchanged byte array that was passed to Find in order to get the
 // places.
-func ReplaceBytes(template []byte, bf Buffer, places []int, replacements map[string][]byte) {
+func ReplaceBytes(template []byte, wr io.Writer, places []int, replacements map[string][]byte) {
 	var (
 		last        int
 		first       int
@@ -217,7 +217,7 @@ func ReplaceBytes(template []byte, bf Buffer, places []int, replacements map[str
 		first = places[i]
 
 		// take the bytes from the last position within the template up to the placeholder
-		bf.Write(template[last:first])
+		wr.Write(template[last:first])
 
 		// track the last position for the next iteration
 
@@ -225,13 +225,13 @@ func ReplaceBytes(template []byte, bf Buffer, places []int, replacements map[str
 		// write the replacement if we found one
 		replacement, has = replacements[string(template[first+2:places[i+1]])]
 		if has {
-			bf.Write(replacement)
+			wr.Write(replacement)
 		}
 
 		last = places[i+1] + 2
 	}
 
-	bf.Write(template[last:]) // write any remaining parts of the template that don't have any placeholders
+	wr.Write(template[last:]) // write any remaining parts of the template that don't have any placeholders
 }
 
 // Mapper maps strings.
@@ -293,8 +293,8 @@ func ReplaceMapper(template []byte, bf Buffer, places []int, mapper Mapper) {
 }
 
 // FindAndReplace finds placeholders and replaces them in one go.
-func FindAndReplace(template []byte, bf Buffer, replacements map[string]io.ReadSeeker) {
-	Replace(template, bf, Find(template), replacements)
+func FindAndReplace(template []byte, wr io.Writer, replacements map[string]io.ReadSeeker) {
+	Replace(template, wr, Find(template), replacements)
 }
 
 // FindAndReplaceString finds placeholders and replaces them in one go.
@@ -303,8 +303,8 @@ func FindAndReplaceString(template []byte, bf Buffer, replacements map[string]st
 }
 
 // FindAndReplaceBytes finds placeholders and replaces them in one go.
-func FindAndReplaceBytes(template []byte, bf Buffer, replacements map[string][]byte) {
-	ReplaceBytes(template, bf, Find(template), replacements)
+func FindAndReplaceBytes(template []byte, wr io.Writer, replacements map[string][]byte) {
+	ReplaceBytes(template, wr, Find(template), replacements)
 }
 
 // FindAndReplaceMapper finds placeholders and replaces them in one go.
